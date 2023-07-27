@@ -112,7 +112,7 @@ class DealFinder:
             range_val=200,
             region="CA",
             offset=0,
-            count=3
+            count=50
         )
 
         available_cars = await self.async_get_cars(uri)
@@ -123,7 +123,7 @@ class DealFinder:
             email_content = ''
             count = 0 
             for car in discounted:
-                if car.discount >= 2500:
+                if car.discount > 0:
                     count+=1
                     email_content += f"<br>{car.format_in_html()}"
                     raw_text += f"{car.display_info()} \n"
@@ -139,7 +139,7 @@ class DealFinder:
     async def async_start_monitor(self):
         while(True):
             await self.async_monitor()
-            await asyncio.sleep(10)
+            await asyncio.sleep(1000)
 
 
 deals = DealFinder()
