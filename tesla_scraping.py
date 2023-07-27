@@ -97,9 +97,9 @@ class DealFinder:
         await self.push_bullet_api.send_push_notification("Deal alert", content)
         
     
-    async def async_monitor(self):
+    async def async_monitor(self, model:str):
         uri = self.generate_uri(
-            model="my",
+            model=model,
             condition="new",
             arrangeby="Price",
             order="asc",
@@ -123,7 +123,7 @@ class DealFinder:
             email_content = ''
             count = 0 
             for car in discounted:
-                if car.discount > 0:
+                if car.discount > 2500:
                     count+=1
                     email_content += f"<br>{car.format_in_html()}"
                     raw_text += f"{car.display_info()} \n"
@@ -138,13 +138,15 @@ class DealFinder:
     
     async def async_start_monitor(self):
         while(True):
-            await self.async_monitor()
-            await asyncio.sleep(1000)
+            await self.async_monitor("m3")
+            await self.async_monitor("my")
+            await asyncio.sleep(3600)
+            print("we will wait for 1hr and try again!")
 
 
 deals = DealFinder()
 print("****** Start Monitoring, you will be notified!!******")
-asyncio.run(deals.async_monitor())
+asyncio.run(deals.async_start_monitor())
     
     
     
