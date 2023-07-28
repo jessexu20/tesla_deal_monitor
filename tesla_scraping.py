@@ -86,6 +86,9 @@ class DealFinder:
         await self.push_bullet_api.send_push_notification("Deal alert", content)
     
     async def async_monitor(self, model: str):
+        """
+        This function monitors the Tesla inventory for deals and sends notifications if any are found.
+        """
         uri = self.generate_uri(
             model=model,
             condition="new",
@@ -146,6 +149,9 @@ class DealFinder:
             print(e)
 
     async def async_start_monitor(self):
+        """
+        This function starts the monitoring process, continuously checking for deals at regular intervals.
+        """
         while True:
             await self.async_load_cache()
             await self.async_monitor("my")
