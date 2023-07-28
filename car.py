@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+import json
 
 @dataclass
 class Car:
@@ -19,6 +20,14 @@ class Car:
     def is_new(self):
         return "NEW"  if self.odometer <= 100  else "USED"
     
+    def as_record(self, time:str)-> str:
+        car_data = asdict(self)
+        car_data["status"] = self.is_new()
+        car_data["link"] = self.get_link()
+        car_data["parse_time"] = time
+        return json.dumps(car_data)
+
+
     def display_info(self):
         return f"{self.is_new()} | Price: now: {self.price} | discount: {self.discount} | before: {self.price_before_discount}  | {self.model} | Odometer: {self.odometer}| Vin: {self.vin} |color: {self.color} | link: {self.get_link()} "
 

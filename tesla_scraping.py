@@ -1,14 +1,19 @@
+import datetime
 import requests
 from urllib.parse import quote
 import json
 from bs4 import BeautifulSoup
 from car import Car
-from typing import  List
+from typing import  Dict, List
 import asyncio
 from push_bullet_api import PushBulletAPI
 from iffft_api import IFFFTAPI
 
-class DealFinder: 
+class DealFinder:
+    FILE_PATH = "tesla_price.log"
+    DISCOUNT_TO_MONITOR = 3500;
+    COOL_DOWN = 900;
+    cache = {}
     
     # init method or constructor
     def __init__(self):
@@ -55,7 +60,6 @@ class DealFinder:
             response = requests.get(url)
     
             response.raise_for_status()
-            # print(response.text)
             results = json.loads(response.text)['results']
             
     
@@ -123,25 +127,54 @@ class DealFinder:
             email_content = ''
             count = 0 
             for car in discounted:
-                if car.discount > 2500:
+                if car.discount > self.DISCOUNT_TO_MONITOR and count < 10:
+                    if car.vin in self.cache:
+                        continue
                     count+=1
+                    self.cache[car.vin] = car.as_record(datetime.datetime.now().ctime())
                     email_content += f"<br>{car.format_in_html()}"
                     raw_text += f"{car.display_info()} \n"
             if count > 0:
-                print("ready to send notif")
+                print("ready to notify")
                 await self._async_send_chrome_notif(raw_text)
                 await self.iffft_api.trigger(IFFFTAPI.DEAL_FOUND, f"<br>{email_content}<br>")
 
         except Exception as e:
             print(e)
+
+
+    async def async_write_log_file(self, content: Dict[str, str]):
+        # Writing to the file
+        with open(self.FILE_PATH, "a") as file:
+            file.write(json.dumps(content) + "\n")
+
+
+    async def async_load_cache(self):
+        try:
+            with open(self.FILE_PATH, "r") as file: 
+                for line in file.readlines():
+                    record = json.loads(line)
+                    for _, v in record.items():
+                        parse_time = json.loads(v)["parse_time"]
+                        dt_object = datetime.datetime.strptime(parse_time, "%a %b %d %H:%M:%S %Y")
+                        current_datetime = datetime.datetime.now()
+                        time_difference = current_datetime - dt_object
+                        one_day_timedelta = datetime.timedelta(minutes=60)
+                        if time_difference < one_day_timedelta:
+                            self.cache.update(record)
+        except Exception as e:
+            print(e)
+
         
-    
     async def async_start_monitor(self):
         while(True):
-            await self.async_monitor("m3")
+            await self.async_load_cache()
             await self.async_monitor("my")
-            await asyncio.sleep(3600)
-            print("we will wait for 1hr and try again!")
+            await self.async_write_log_file(self.cache)
+            print("we will wait for {self.COOL_DOWN} seconds and try again!")
+            await asyncio.sleep(self.COOL_DOWN)
+            
+            
 
 
 deals = DealFinder()
