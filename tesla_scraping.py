@@ -2,7 +2,6 @@ import datetime
 import requests
 from urllib.parse import quote
 import json
-from bs4 import BeautifulSoup
 from car import Car
 from typing import Dict, List
 import asyncio
