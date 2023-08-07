@@ -114,7 +114,7 @@ class DealFinder:
         discounted = self.get_discounted_tesla(available_cars)
     
         try:
-            # await self.log(discounted_cars=discounted)
+            await self.log(discounted_cars=discounted)
             await self.notify(discounted)
 
         except Exception as e:
@@ -164,9 +164,8 @@ class DealFinder:
             print(f"we will wait for {self.COOL_DOWN} seconds and try again!")
             cur_time = datetime.now()
             if cur_time.minute < 20:
-                print("sending digest")
+                print(f"Sending digest for{cur_time.hour}")
                 digest_content = await self.digest_service.async_generate_hourly_digest_email_content()
-                print(digest_content)
                 await self.iffft_api.trigger(IFFFTAPI.DIGEST, f"<br>{digest_content}<br>")
             if cur_time.hour == self.TIME_TO_CLEAR_CACHE:
                 self.cache = {}

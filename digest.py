@@ -11,6 +11,8 @@ class Digest:
 
     async def async_generate_hourly_digest_email_content(self):
         cur_digest = await self._async_generate_hourly_digest_info()
+        if not cur_digest:
+            return None
         cur_time = datetime.now().ctime()
         html = f"<h1> Time {cur_time}</h1>\n"
         count = 0
@@ -20,14 +22,13 @@ class Digest:
             count+=1
             if count == self.LIMIT_NUMBER:
                 break
-        
         return html
 
 
     def _format_in_html(self, data: Dict[str, Any]):
         html_template = """
 <ul>
-    <li>Model: {model}</li>
+    <li>Model: {color}, {model}</li>
     <li>Status: {status}</li>
     <li>Discount {discount})</li>
 </ul>
@@ -53,12 +54,12 @@ class Digest:
                             cur_digest[k] = {
                                 "model" : car["model"],
                                 "discount": car["discount"],
+                                "color": car["color"],
                                 "status": car["status"]
                             }
-                # print(json.dumps(cur_digest))
                 return cur_digest
         except Exception as e:
             print(e) 
 
 # d =  Digest()
-# asyncio.run(d.async_generate_hourly_digest_email())
+# asyncio.run(d.async_generate_hourly_digest_email_content())
