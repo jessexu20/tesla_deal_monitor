@@ -1,22 +1,28 @@
-import datetime
+from datetime import datetime 
 import requests
 from urllib.parse import quote
 import json
 from car import Car
 from typing import Dict, List
 import asyncio
+from digest import Digest
+from logger import Logger
 from push_bullet_api import PushBulletAPI
 from iffft_api import IFFFTAPI
 
 class DealFinder:
-    FILE_PATH = "tesla_price.log"
-    DISCOUNT_TO_MONITOR = 3500
+    RAW_LOG_FILE_PATH = "tesla_price_raw.log"
+    DISCOUNT_TO_ALERT = 3500
     COOL_DOWN = 900
+    TIME_TO_CLEAR_CACHE = 1
     cache = {}
     
     def __init__(self):
         self.push_bullet_api = PushBulletAPI()
         self.iffft_api = IFFFTAPI()
+        self.already_alerted = {}
+        self.logger = Logger(self.RAW_LOG_FILE_PATH)
+        self.digest_service = Digest()
     
     def generate_uri(self, model, condition, arrangeby, order, market, language, super_region, lng, lat, zip_code, range_val, region, offset, count) -> str:
         base_url = "https://www.tesla.com/inventory/api/v1/inventory-results"
@@ -108,54 +114,62 @@ class DealFinder:
         discounted = self.get_discounted_tesla(available_cars)
     
         try:
+            # await self.log(discounted_cars=discounted)
+            await self.notify(discounted)
+
+        except Exception as e:
+            print(e)
+
+    async def notify(self, discounted_cars: List[Car]):
+        try:
             raw_text = ''
             email_content = ''
             count = 0 
-            for car in discounted:
-                if car.discount > self.DISCOUNT_TO_MONITOR and count < 10:
-                    if car.vin in self.cache:
-                        continue
+            for car in discounted_cars:
+                if car.discount > self.DISCOUNT_TO_ALERT and count < 10 and car.vin not in self.already_alerted: 
                     count += 1
-                    self.cache[car.vin] = car.as_record(datetime.datetime.now().ctime())
+                    self.already_alerted[car.vin] = car.as_record(datetime.now())
                     email_content += f"<br>{car.format_in_html()}"
                     raw_text += f"{car.display_info()} \n"
             if count > 0:
-                print("ready to notify")
+                print(f"Ready to notify: {count} cars")
                 await self._async_send_chrome_notif(raw_text)
                 await self.iffft_api.trigger(IFFFTAPI.DEAL_FOUND, f"<br>{email_content}<br>")
 
         except Exception as e:
             print(e)
 
-    async def async_write_log_file(self, content: Dict[str, str]):
-        with open(self.FILE_PATH, "a") as file:
-            file.write(json.dumps(content) + "\n")
-
-    async def async_load_cache(self):
+    
+    async def log(self,  discounted_cars: List[Car]):
+        """
+            "vin: car "
+        """
+        raw_log = {}
+        ts = datetime.now() 
         try:
-            with open(self.FILE_PATH, "r") as file: 
-                for line in file.readlines():
-                    record = json.loads(line)
-                    for _, v in record.items():
-                        parse_time = json.loads(v)["parse_time"]
-                        dt_object = datetime.datetime.strptime(parse_time, "%a %b %d %H:%M:%S %Y")
-                        current_datetime = datetime.datetime.now()
-                        time_difference = current_datetime - dt_object
-                        one_day_timedelta = datetime.timedelta(minutes=60)
-                        if time_difference < one_day_timedelta:
-                            self.cache.update(record)
+            for car in discounted_cars:
+                raw_log[car.vin] = car.as_record(ts)
+            await self.logger.async_write_log_file(raw_log)
+        
         except Exception as e:
             print(e)
+
 
     async def async_start_monitor(self):
         """
         This function starts the monitoring process, continuously checking for deals at regular intervals.
         """
         while True:
-            await self.async_load_cache()
             await self.async_monitor("my")
-            await self.async_write_log_file(self.cache)
             print(f"we will wait for {self.COOL_DOWN} seconds and try again!")
+            cur_time = datetime.now()
+            if cur_time.minute < 20:
+                print("sending digest")
+                digest_content = await self.digest_service.async_generate_hourly_digest_email_content()
+                print(digest_content)
+                await self.iffft_api.trigger(IFFFTAPI.DIGEST, f"<br>{digest_content}<br>")
+            if cur_time.hour == self.TIME_TO_CLEAR_CACHE:
+                self.cache = {}
             await asyncio.sleep(self.COOL_DOWN)
 
 deals = DealFinder()

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+from datetime import datetime
 import json
 
 @dataclass
@@ -20,11 +21,11 @@ class Car:
     def is_new(self):
         return "NEW"  if self.odometer <= 100  else "USED"
     
-    def as_record(self, time:str)-> str:
+    def as_record(self, time: datetime)-> str:
         car_data = asdict(self)
         car_data["status"] = self.is_new()
         car_data["link"] = self.get_link()
-        car_data["parse_time"] = time
+        car_data["parse_time"] = time.timestamp()
         return json.dumps(car_data)
 
 
